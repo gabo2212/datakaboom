@@ -676,10 +676,38 @@ label,
 [data-testid="stChatMessage"] {
     margin-bottom: 0.8rem;
     padding: 1rem 1.1rem;
+    color: var(--ink) !important;
     background: rgba(240, 242, 245, 0.58);
     border: 1px solid rgba(255, 255, 255, 0.8);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sharp);
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] li,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] strong,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] em,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h1,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h2,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h3,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h4,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] blockquote {
+    color: var(--ink) !important;
+    text-shadow: none;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] li::marker {
+    color: var(--ink-muted) !important;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] a {
+    color: var(--accent-dark) !important;
+}
+
+[data-testid="stChatMessage"] [data-testid="stCaptionContainer"],
+[data-testid="stChatMessage"] [data-testid="stCaptionContainer"] p {
+    color: var(--ink-muted) !important;
 }
 
 [data-testid="stChatMessageAvatarUser"] {
@@ -701,7 +729,8 @@ label,
 
 [data-testid="stChatInput"] textarea {
     min-height: 48px !important;
-    color: var(--ink) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
 }
 
 [data-testid="stChatInput"] button {
