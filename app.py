@@ -60,106 +60,17 @@ from ai_assistant import (  # noqa: E402
 
 st.set_page_config(
     page_title="Big File EDA Dashboard",
-    page_icon="📊",
+    page_icon="⚙️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
 def inject_css() -> None:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background:
-                radial-gradient(circle at top left, rgba(65, 105, 225, 0.18), transparent 28%),
-                radial-gradient(circle at top right, rgba(46, 139, 87, 0.16), transparent 26%),
-                linear-gradient(180deg, #0f172a 0%, #111827 46%, #0b1220 100%);
-            color: #e5eefb;
-        }
-        section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #0b1020 0%, #10192d 100%);
-            border-right: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        section[data-testid="stSidebar"] * {
-            color: #e5eefb;
-        }
-        .block-container {
-            padding-top: 1.1rem;
-            padding-bottom: 2rem;
-        }
-        .hero {
-            padding: 1.3rem 1.4rem;
-            border-radius: 22px;
-            background: linear-gradient(135deg, rgba(18, 27, 54, 0.94), rgba(11, 18, 32, 0.92));
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-            margin-bottom: 1rem;
-        }
-        .eyebrow {
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            font-size: 0.72rem;
-            color: #93c5fd;
-            margin-bottom: 0.5rem;
-        }
-        .hero h1 {
-            font-size: 2.2rem;
-            line-height: 1.05;
-            margin: 0 0 0.55rem 0;
-            color: #f8fbff;
-        }
-        .hero p {
-            margin: 0;
-            color: #c7d2fe;
-            max-width: 960px;
-        }
-        .soft-card {
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-radius: 18px;
-            padding: 1rem 1rem 0.75rem 1rem;
-            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.16);
-        }
-        .section-title {
-            font-size: 1.05rem;
-            font-weight: 700;
-            margin-bottom: 0.4rem;
-            color: #f8fafc;
-        }
-        .subtle {
-            color: #9fb1cf;
-            font-size: 0.92rem;
-        }
-        div[data-testid="metric-container"] {
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-radius: 18px;
-            padding: 0.8rem 0.9rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-        }
-        div[data-testid="metric-container"] label {
-            color: #9fb1cf !important;
-        }
-        div[data-testid="metric-container"] [data-testid="stMetricValue"] {
-            color: #f8fafc !important;
-        }
-        .status-good {
-            color: #86efac;
-            font-weight: 700;
-        }
-        .status-warn {
-            color: #fbbf24;
-            font-weight: 700;
-        }
-        .status-bad {
-            color: #fca5a5;
-            font-weight: 700;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Load the centralized industrial design system for every dashboard surface."""
+
+    stylesheet = (ROOT_DIR / "assets" / "dashboard.css").read_text(encoding="utf-8")
+    st.markdown(f"<style>{stylesheet}</style>", unsafe_allow_html=True)
 
 
 REPORT_INPUT_PATHS = (
@@ -249,15 +160,28 @@ def download_link(path: Path, label: str, *, key: str | None = None) -> None:
 
 def render_header(metrics: dict[str, int]) -> None:
     st.markdown(
-        """
+        f"""
         <div class="hero">
-          <div class="eyebrow">Assignment dashboard</div>
-          <h1>Big File EDA and Cleaning</h1>
-          <p>
-            Review the raw workbook, the EDA outputs, the accepted cleaning decisions,
-            and the cleaned dataset in one place. This dashboard is read-only and built
-            from the generated reports.
-          </p>
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="status-led"></span> Data control console / 01</div>
+            <h1>Big File EDA<br><span>and Cleaning</span></h1>
+            <p>
+              Inspect the raw workbook, audit every cleaning decision, and verify the
+              final analysis-ready dataset from one calibrated workspace.
+            </p>
+          </div>
+          <div class="instrument-panel" aria-label="Dataset processing status">
+            <div class="instrument-bar">
+              <span>PIPELINE STATUS</span>
+              <span class="online-label"><span class="status-led status-led--green"></span>OPERATIONAL</span>
+            </div>
+            <div class="instrument-screen">
+              <div><span>ROWS INDEXED</span><strong>{metrics.get('raw_rows', 0):,}</strong></div>
+              <div><span>FIELDS / RAW</span><strong>{metrics.get('columns', 0):02d}</strong></div>
+              <div><span>FIXES APPLIED</span><strong>{metrics.get('corrections_applied', 0):,}</strong></div>
+            </div>
+            <div class="vent-bank" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -708,9 +632,9 @@ def render_cleaning(loads: dict[str, object]) -> None:
               <p class="subtle">What was preserved</p>
               <p>The original organization name remains in the dataset.</p>
               <p class="subtle">What was added</p>
-              <p>`recipient_legal_name_clean` contains the accepted cleaned value.</p>
+              <p><code>recipient_legal_name_clean</code> contains the accepted cleaned value.</p>
               <p class="subtle">What was skipped</p>
-              <p>Rows marked `review` were not applied automatically.</p>
+              <p>Rows marked <code>review</code> were not applied automatically.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -865,13 +789,30 @@ def main() -> None:
         render_reports(loads)
 
     with st.sidebar:
-        st.markdown("### Quick facts")
-        st.markdown(f"- Raw CSV: `{RAW_CSV.name}`")
-        st.markdown(f"- Processed CSV: `{PROCESSED_CSV.name}`")
-        st.markdown(f"- Final fixed CSV: `{REMEDIATED_CSV.name}`")
-        st.markdown(f"- Reports folder: `{(ROOT_DIR / 'reports').name}/`")
-        st.markdown("### Status")
-        st.write("Everything shown here is read-only and generated from the reports in this repository.")
+        st.markdown(
+            """
+            <div class="sidebar-brand">
+              <div class="brand-mark">DK</div>
+              <div><strong>DATAKABOOM</strong><span>QUALITY SYSTEM</span></div>
+            </div>
+            <div class="sidebar-status"><span class="status-led status-led--green"></span>SYSTEM OPERATIONAL</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("### Mounted files")
+        st.markdown(
+            f"""
+            <div class="file-stack">
+              <div><span>RAW INPUT</span><code>{RAW_CSV.name}</code></div>
+              <div><span>ORG CLEAN</span><code>{PROCESSED_CSV.name}</code></div>
+              <div><span>FINAL FIXED</span><code>{REMEDIATED_CSV.name}</code></div>
+              <div><span>REPORT BANK</span><code>{(ROOT_DIR / 'reports').name}/</code></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("### Console state")
+        st.write("Read-only interface. Every displayed value is generated from auditable repository artifacts.")
 
 
 if __name__ == "__main__":
