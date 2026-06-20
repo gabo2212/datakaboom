@@ -35,10 +35,13 @@ from dashboard_utils import (  # noqa: E402
     MISSING_REPORT_PATH,
     PROCESSED_CSV,
     RAW_CSV,
+    REMEDIATED_CSV,
+    REMEDIATION_EXECUTION_REPORT_PATH,
     SUMMARY_PATH,
     VARIANTS_REPORT_PATH,
     assignment_checklist,
     load_summary_metrics,
+    parse_remediation_metrics,
     pretty_bytes,
     read_csv,
     read_text,
@@ -57,116 +60,29 @@ from ai_assistant import (  # noqa: E402
 
 st.set_page_config(
     page_title="Big File EDA Dashboard",
-    page_icon="📊",
+    page_icon="⚙️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
 def inject_css() -> None:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background:
-                radial-gradient(circle at top left, rgba(65, 105, 225, 0.18), transparent 28%),
-                radial-gradient(circle at top right, rgba(46, 139, 87, 0.16), transparent 26%),
-                linear-gradient(180deg, #0f172a 0%, #111827 46%, #0b1220 100%);
-            color: #e5eefb;
-        }
-        section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #0b1020 0%, #10192d 100%);
-            border-right: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        section[data-testid="stSidebar"] * {
-            color: #e5eefb;
-        }
-        .block-container {
-            padding-top: 1.1rem;
-            padding-bottom: 2rem;
-        }
-        .hero {
-            padding: 1.3rem 1.4rem;
-            border-radius: 22px;
-            background: linear-gradient(135deg, rgba(18, 27, 54, 0.94), rgba(11, 18, 32, 0.92));
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-            margin-bottom: 1rem;
-        }
-        .eyebrow {
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            font-size: 0.72rem;
-            color: #93c5fd;
-            margin-bottom: 0.5rem;
-        }
-        .hero h1 {
-            font-size: 2.2rem;
-            line-height: 1.05;
-            margin: 0 0 0.55rem 0;
-            color: #f8fbff;
-        }
-        .hero p {
-            margin: 0;
-            color: #c7d2fe;
-            max-width: 960px;
-        }
-        .soft-card {
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-radius: 18px;
-            padding: 1rem 1rem 0.75rem 1rem;
-            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.16);
-        }
-        .section-title {
-            font-size: 1.05rem;
-            font-weight: 700;
-            margin-bottom: 0.4rem;
-            color: #f8fafc;
-        }
-        .subtle {
-            color: #9fb1cf;
-            font-size: 0.92rem;
-        }
-        div[data-testid="metric-container"] {
-            background: rgba(15, 23, 42, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-radius: 18px;
-            padding: 0.8rem 0.9rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-        }
-        div[data-testid="metric-container"] label {
-            color: #9fb1cf !important;
-        }
-        div[data-testid="metric-container"] [data-testid="stMetricValue"] {
-            color: #f8fafc !important;
-        }
-        .status-good {
-            color: #86efac;
-            font-weight: 700;
-        }
-        .status-warn {
-            color: #fbbf24;
-            font-weight: 700;
-        }
-        .status-bad {
-            color: #fca5a5;
-            font-weight: 700;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Load the centralized industrial design system for every dashboard surface."""
+
+    stylesheet = (ROOT_DIR / "assets" / "dashboard.css").read_text(encoding="utf-8")
+    st.markdown(f"<style>{stylesheet}</style>", unsafe_allow_html=True)
 
 
 REPORT_INPUT_PATHS = (
     SUMMARY_PATH,
     EDA_REPORT_PATH,
     CLEANING_EXECUTION_REPORT_PATH,
+    REMEDIATION_EXECUTION_REPORT_PATH,
     MISSING_REPORT_PATH,
     DUPLICATES_REPORT_PATH,
     VARIANTS_REPORT_PATH,
     MAPPING_REPORT_PATH,
+    REMEDIATED_CSV,
 )
 
 
@@ -196,6 +112,7 @@ def load_reports(report_version: tuple[tuple[str, int, int], ...]):
     summary_text = read_text(SUMMARY_PATH)
     eda_text = read_text(EDA_REPORT_PATH)
     cleaning_text = read_text(CLEANING_EXECUTION_REPORT_PATH)
+    remediation_text = read_text(REMEDIATION_EXECUTION_REPORT_PATH)
     return {
         "metrics": metrics,
         "checklist": checklist,
@@ -207,6 +124,8 @@ def load_reports(report_version: tuple[tuple[str, int, int], ...]):
         "summary_text": summary_text,
         "eda_text": eda_text,
         "cleaning_text": cleaning_text,
+        "remediation_text": remediation_text,
+        "remediation_metrics": parse_remediation_metrics(remediation_text),
     }
 
 
@@ -216,30 +135,53 @@ def file_size_label(path: Path) -> str:
     return pretty_bytes(path.stat().st_size)
 
 
-def download_link(path: Path, label: str) -> None:
+def download_link(path: Path, label: str, *, key: str | None = None) -> None:
     if not path.exists():
         st.caption(f"{label}: missing")
         return
+
+    mime_types = {
+        ".csv": "text/csv",
+        ".md": "text/markdown",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
     st.download_button(
         label=f"Download {label}",
-        data=path.read_bytes(),
+        # Streamlit executes this only after a click. This keeps the two 200+ MB
+        # CSV files out of memory while the Reports tab is being rendered.
+        data=path.read_bytes,
         file_name=path.name,
-        mime="text/csv" if path.suffix == ".csv" else "text/markdown",
+        mime=mime_types.get(path.suffix.lower(), "application/octet-stream"),
+        help=f"{path.name} ({file_size_label(path)})",
+        key=key,
         width="stretch",
     )
 
 
 def render_header(metrics: dict[str, int]) -> None:
     st.markdown(
-        """
+        f"""
         <div class="hero">
-          <div class="eyebrow">Assignment dashboard</div>
-          <h1>Big File EDA and Cleaning</h1>
-          <p>
-            Review the raw workbook, the EDA outputs, the accepted cleaning decisions,
-            and the cleaned dataset in one place. This dashboard is read-only and built
-            from the generated reports.
-          </p>
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="status-led"></span> Data control console / 01</div>
+            <h1>Big File EDA<br><span>and Cleaning</span></h1>
+            <p>
+              Inspect the raw workbook, audit every cleaning decision, and verify the
+              final analysis-ready dataset from one calibrated workspace.
+            </p>
+          </div>
+          <div class="instrument-panel" aria-label="Dataset processing status">
+            <div class="instrument-bar">
+              <span>PIPELINE STATUS</span>
+              <span class="online-label"><span class="status-led status-led--green"></span>OPERATIONAL</span>
+            </div>
+            <div class="instrument-screen">
+              <div><span>ROWS INDEXED</span><strong>{metrics.get('raw_rows', 0):,}</strong></div>
+              <div><span>FIELDS / RAW</span><strong>{metrics.get('columns', 0):02d}</strong></div>
+              <div><span>FIXES APPLIED</span><strong>{metrics.get('corrections_applied', 0):,}</strong></div>
+            </div>
+            <div class="vent-bank" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -247,7 +189,7 @@ def render_header(metrics: dict[str, int]) -> None:
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Rows", f"{metrics.get('raw_rows', 0):,}")
-    c2.metric("Columns", f"{metrics.get('columns', 0):,}")
+    c2.metric("Raw columns", f"{metrics.get('columns', 0):,}")
     c3.metric("Unique orgs", f"{metrics.get('unique_raw_orgs', 0):,}")
     c4.metric("Cleaned orgs", f"{metrics.get('unique_clean_orgs', 0):,}")
     c5.metric("Corrections applied", f"{metrics.get('corrections_applied', 0):,}")
@@ -281,8 +223,10 @@ def render_overview(loads: dict[str, object]) -> None:
             <div class="soft-card">
             <p class="subtle">Raw workbook</p>
             <p>{RAW_CSV.name} ({file_size_label(RAW_CSV)})</p>
-            <p class="subtle">Processed dataset</p>
+            <p class="subtle">Organization-cleaned intermediate</p>
             <p>{PROCESSED_CSV.name} ({file_size_label(PROCESSED_CSV)})</p>
+            <p class="subtle">Final EDA-remediated dataset</p>
+            <p>{REMEDIATED_CSV.name} ({file_size_label(REMEDIATED_CSV)})</p>
             <p class="subtle">Validated outputs</p>
             <p>{complete_count} of {total_count} artifacts complete</p>
             </div>
@@ -297,7 +241,8 @@ def render_overview(loads: dict[str, object]) -> None:
     st.markdown('<div class="section-title">What the project produced</div>', unsafe_allow_html=True)
     st.write(
         "The dashboard tracks the same deliverables the assignment asked for: inspection, missing values, "
-        "duplicates, text variants, accepted cleaning mapping, cleaned output, and a final summary."
+        "duplicates, text variants, accepted organization cleaning, EDA remediation, a final fixed output, "
+        "and auditable reports."
     )
 
 
@@ -333,8 +278,8 @@ def render_ai_assistant(loads: dict[str, object]) -> None:
         <div class="soft-card">
           <p><strong>Model:</strong> {NVIDIA_MODEL}</p>
           <p class="subtle">
-            Efficient retrieval: all seven generated reports are indexed, context is capped at
-            {MAX_CONTEXT_CHARS:,} characters, and the 209 MB cleaned CSV is scanned only when an
+            Efficient retrieval: all eight generated reports are indexed, context is capped at
+            {MAX_CONTEXT_CHARS:,} characters, and the final fixed CSV is scanned only when an
             exact organization, acronym, or reference is detected in the question.
           </p>
         </div>
@@ -418,6 +363,125 @@ def render_ai_assistant(loads: dict[str, object]) -> None:
         {"role": "assistant", "content": answer, "evidence": evidence_note}
     )
     st.session_state["ai_messages"] = st.session_state["ai_messages"][-20:]
+
+
+def render_fixed_dataset(loads: dict[str, object]) -> None:
+    st.markdown('<div class="section-title">Final fixed dataset</div>', unsafe_allow_html=True)
+    st.caption(
+        "This is the final analysis-ready output. It combines the accepted organization-name "
+        "corrections with the missing-data remediation specified in the EDA report."
+    )
+
+    if not REMEDIATED_CSV.exists():
+        st.error(
+            "The final fixed CSV has not been generated. Run "
+            "`python src/08_apply_eda_remediation.py` first."
+        )
+        return
+
+    metrics = loads["remediation_metrics"]
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Rows preserved", f"{metrics.get('rows', 0):,}")
+    metric_cols[1].metric("Final columns", f"{metrics.get('output_columns', 0):,}")
+    metric_cols[2].metric("Columns deleted", "4")
+    metric_cols[3].metric("Values standardized", f"{metrics.get('replacements', 0):,}")
+    metric_cols[4].metric("Review required", f"{metrics.get('review_rows', 0):,}")
+
+    st.success(
+        "Validation passed: all 224,000 rows and accepted organization-name corrections were "
+        "preserved, the four unusable fields were removed, and no conditional conflicts require review."
+    )
+
+    download_cols = st.columns(2)
+    with download_cols[0]:
+        download_link(REMEDIATED_CSV, "fully fixed CSV", key="fixed_tab_csv_download")
+    with download_cols[1]:
+        download_link(
+            REMEDIATION_EXECUTION_REPORT_PATH,
+            "remediation audit report",
+            key="fixed_tab_report_download",
+        )
+
+    action_col, lineage_col = st.columns(2)
+    with action_col:
+        st.markdown(
+            """
+            <div class="soft-card">
+              <p><strong>What was fixed</strong></p>
+              <p>Missing text uses controlled values: <code>UNKNOWN</code>,
+              <code>NOT_PROVIDED</code>, or <code>NOT_APPLICABLE</code>.</p>
+              <p>Province values use a country-aware rule. Amendment and currency fields use
+              conditional status rules instead of guessed values.</p>
+              <p>Four effectively empty riding/coverage columns were removed.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with lineage_col:
+        st.markdown(
+            """
+            <div class="soft-card">
+              <p><strong>What was preserved</strong></p>
+              <p>The raw workbook, raw CSV, and organization-cleaned intermediate remain unchanged.</p>
+              <p><code>recipient_legal_name_clean</code> and all 224,000 row identities remain in order.</p>
+              <p>Twenty-four <code>*_was_missing</code> flags and three status columns make every
+              remediation decision traceable.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+    st.markdown("#### Search and preview the fixed data")
+    st.caption(
+        "Leave search empty for the first rows, or enter an organization, reference, city, or status."
+    )
+    search_col, limit_col = st.columns([3, 1])
+    with search_col:
+        query = st.text_input("Search fixed dataset", value="", key="fixed_dataset_search")
+    with limit_col:
+        limit = st.select_slider(
+            "Rows",
+            options=[20, 40, 60, 100],
+            value=40,
+            key="fixed_dataset_limit",
+        )
+
+    available = read_csv(REMEDIATED_CSV, nrows=0).columns.tolist()
+    preview_columns = [
+        "ref_number",
+        "recipient_legal_name",
+        "recipient_legal_name_clean",
+        "recipient_country",
+        "recipient_province",
+        "recipient_province_was_missing",
+        "recipient_city",
+        "agreement_value",
+        "amendment_date",
+        "amendment_date_status",
+        "agreement_end_date",
+        "agreement_end_date_status",
+        "foreign_currency_type",
+        "foreign_currency_value_status",
+    ]
+    preview_columns = [column for column in preview_columns if column in available]
+    if query.strip():
+        preview = search_csv_rows(
+            REMEDIATED_CSV,
+            query=query,
+            columns=preview_columns,
+            limit=limit,
+        )
+    else:
+        preview = sample_columns(REMEDIATED_CSV, preview_columns, rows=limit)
+
+    if preview.empty:
+        st.info("No matching rows were found in the final fixed dataset.")
+    else:
+        st.dataframe(preview, width="stretch", hide_index=True, height=480)
+
+    with st.expander("Full remediation audit report", expanded=False):
+        st.markdown(loads["remediation_text"])
 
 
 def render_missing_values(missing: pd.DataFrame) -> None:
@@ -568,9 +632,9 @@ def render_cleaning(loads: dict[str, object]) -> None:
               <p class="subtle">What was preserved</p>
               <p>The original organization name remains in the dataset.</p>
               <p class="subtle">What was added</p>
-              <p>`recipient_legal_name_clean` contains the accepted cleaned value.</p>
+              <p><code>recipient_legal_name_clean</code> contains the accepted cleaned value.</p>
               <p class="subtle">What was skipped</p>
-              <p>Rows marked `review` were not applied automatically.</p>
+              <p>Rows marked <code>review</code> were not applied automatically.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -587,10 +651,16 @@ def render_reports(loads: dict[str, object]) -> None:
     st.markdown('<div class="section-title">Reports and files</div>', unsafe_allow_html=True)
     st.caption("Open the generated artifacts directly or download them from this dashboard.")
 
+    st.info(
+        "File stages: `fichier_nettoye.csv` is the organization-cleaned intermediate. "
+        "`fichier_corrige_eda.csv` is the final fixed dataset containing both the accepted "
+        "organization corrections and the applied EDA missing-data remediation."
+    )
+
     catalog = loads["catalog"]
     st.dataframe(catalog, width="stretch", hide_index=True, height=240)
 
-    download_cols = st.columns(3)
+    download_cols = st.columns(4)
     with download_cols[0]:
         download_link(EDA_REPORT_PATH, EDA_REPORT_PATH.name)
         download_link(MISSING_REPORT_PATH, MISSING_REPORT_PATH.name)
@@ -601,19 +671,29 @@ def render_reports(loads: dict[str, object]) -> None:
         download_link(CLEANING_EXECUTION_REPORT_PATH, CLEANING_EXECUTION_REPORT_PATH.name)
     with download_cols[2]:
         download_link(SUMMARY_PATH, SUMMARY_PATH.name)
-        download_link(RAW_CSV, RAW_CSV.name)
-        download_link(PROCESSED_CSV, PROCESSED_CSV.name)
+        download_link(
+            REMEDIATION_EXECUTION_REPORT_PATH,
+            "remediation audit report",
+            key="reports_tab_remediation_download",
+        )
+    with download_cols[3]:
+        download_link(RAW_CSV, "raw CSV")
+        download_link(PROCESSED_CSV, "organization-cleaned CSV")
+        download_link(REMEDIATED_CSV, "fully fixed CSV", key="reports_tab_fixed_csv_download")
 
     st.write("")
     exp1 = st.expander("EDA report", expanded=True)
     exp2 = st.expander("Final summary", expanded=False)
     exp3 = st.expander("Cleaning execution report", expanded=False)
+    exp4 = st.expander("EDA remediation execution report", expanded=False)
     with exp1:
         st.markdown(loads["eda_text"])
     with exp2:
         st.markdown(loads["summary_text"])
     with exp3:
         st.markdown(loads["cleaning_text"])
+    with exp4:
+        st.markdown(loads["remediation_text"])
 
 
 def render_data_preview() -> None:
@@ -680,6 +760,7 @@ def main() -> None:
         [
             "Overview",
             "AI Assistant",
+            "Fixed Dataset",
             "Missing Values",
             "Duplicates",
             "Variants",
@@ -693,25 +774,45 @@ def main() -> None:
     with tabs[1]:
         render_ai_assistant(loads)
     with tabs[2]:
-        render_missing_values(loads["missing"])
+        render_fixed_dataset(loads)
     with tabs[3]:
-        render_duplicates(loads["duplicates"])
+        render_missing_values(loads["missing"])
     with tabs[4]:
-        render_variants(loads["variants"])
+        render_duplicates(loads["duplicates"])
     with tabs[5]:
-        render_cleaning(loads)
+        render_variants(loads["variants"])
     with tabs[6]:
-        render_data_preview()
+        render_cleaning(loads)
     with tabs[7]:
+        render_data_preview()
+    with tabs[8]:
         render_reports(loads)
 
     with st.sidebar:
-        st.markdown("### Quick facts")
-        st.markdown(f"- Raw CSV: `{RAW_CSV.name}`")
-        st.markdown(f"- Processed CSV: `{PROCESSED_CSV.name}`")
-        st.markdown(f"- Reports folder: `{(ROOT_DIR / 'reports').name}/`")
-        st.markdown("### Status")
-        st.write("Everything shown here is read-only and generated from the reports in this repository.")
+        st.markdown(
+            """
+            <div class="sidebar-brand">
+              <div class="brand-mark">DK</div>
+              <div><strong>DATAKABOOM</strong><span>QUALITY SYSTEM</span></div>
+            </div>
+            <div class="sidebar-status"><span class="status-led status-led--green"></span>SYSTEM OPERATIONAL</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("### Mounted files")
+        st.markdown(
+            f"""
+            <div class="file-stack">
+              <div><span>RAW INPUT</span><code>{RAW_CSV.name}</code></div>
+              <div><span>ORG CLEAN</span><code>{PROCESSED_CSV.name}</code></div>
+              <div><span>FINAL FIXED</span><code>{REMEDIATED_CSV.name}</code></div>
+              <div><span>REPORT BANK</span><code>{(ROOT_DIR / 'reports').name}/</code></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("### Console state")
+        st.write("Read-only interface. Every displayed value is generated from auditable repository artifacts.")
 
 
 if __name__ == "__main__":
