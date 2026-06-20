@@ -1,0 +1,8 @@
+pandas
+numpy
+rapidfuzz
+python-dateutil
+tabulate
+openpyxl
+streamlit
+openai
