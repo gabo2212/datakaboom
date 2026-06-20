@@ -11,6 +11,7 @@ DATA_DIR = ROOT_DIR / "data"
 REPORTS_DIR = ROOT_DIR / "reports"
 RAW_CSV = DATA_DIR / "raw" / "fichier_original.csv"
 PROCESSED_CSV = DATA_DIR / "processed" / "fichier_nettoye.csv"
+REMEDIATED_CSV = DATA_DIR / "processed" / "fichier_corrige_eda.csv"
 SUMMARY_PATH = REPORTS_DIR / "final_summary.md"
 EDA_REPORT_PATH = REPORTS_DIR / "eda_report.md"
 MISSING_REPORT_PATH = REPORTS_DIR / "missing_values_report.csv"
@@ -18,6 +19,7 @@ DUPLICATES_REPORT_PATH = REPORTS_DIR / "duplicates_report.csv"
 VARIANTS_REPORT_PATH = REPORTS_DIR / "organization_variants_report.csv"
 MAPPING_REPORT_PATH = REPORTS_DIR / "entity_cleaning_mapping.csv"
 CLEANING_EXECUTION_REPORT_PATH = REPORTS_DIR / "cleaning_execution_report.md"
+REMEDIATION_EXECUTION_REPORT_PATH = REPORTS_DIR / "eda_remediation_execution_report.md"
 
 
 def exists(path: Path) -> bool:
@@ -74,6 +76,20 @@ def load_summary_metrics() -> dict[str, int]:
     return parse_summary_metrics(read_text(SUMMARY_PATH))
 
 
+def parse_remediation_metrics(report_text: str) -> dict[str, int]:
+    patterns = {
+        "rows": r"Rows processed and preserved: ([0-9,]+)",
+        "input_columns": r"Input columns: ([0-9,]+)",
+        "output_columns": r"Output columns: ([0-9,]+)",
+        "replacements": r"Total fixed text/category values: ([0-9,]+)",
+        "review_rows": r"Rows requiring conditional review: ([0-9,]+)",
+    }
+    return {
+        key: int(match.group(1).replace(",", "")) if (match := re.search(pattern, report_text)) else 0
+        for key, pattern in patterns.items()
+    }
+
+
 def assignment_checklist(metrics: dict[str, int]) -> pd.DataFrame:
     items = [
         ("01 Inspect file", "reports/eda_report.md"),
@@ -83,6 +99,7 @@ def assignment_checklist(metrics: dict[str, int]) -> pd.DataFrame:
         ("05 Cleaning mapping", "reports/entity_cleaning_mapping.csv"),
         ("06 Cleaned output", "data/processed/fichier_nettoye.csv"),
         ("07 Final summary", "reports/final_summary.md"),
+        ("08 EDA-remediated output", "data/processed/fichier_corrige_eda.csv"),
     ]
     return pd.DataFrame(
         [
@@ -104,9 +121,11 @@ def report_catalog() -> pd.DataFrame:
         VARIANTS_REPORT_PATH,
         MAPPING_REPORT_PATH,
         CLEANING_EXECUTION_REPORT_PATH,
+        REMEDIATION_EXECUTION_REPORT_PATH,
         SUMMARY_PATH,
         RAW_CSV,
         PROCESSED_CSV,
+        REMEDIATED_CSV,
     ]
     rows = []
     for path in files:

@@ -49,6 +49,7 @@ python src/04_detect_text_variants.py
 python src/05_build_cleaning_mapping.py
 python src/06_clean_file.py
 python src/07_final_summary.py
+python src/08_apply_eda_remediation.py
 ```
 
 ## Outputs
@@ -60,7 +61,9 @@ python src/07_final_summary.py
 - `reports/entity_cleaning_mapping.csv`
 - `reports/cleaning_execution_report.md`
 - `reports/final_summary.md`
+- `reports/eda_remediation_execution_report.md`
 - `data/processed/fichier_nettoye.csv`
+- `data/processed/fichier_corrige_eda.csv`
 
 ## Dashboard
 
@@ -77,6 +80,7 @@ The dashboard includes:
 - a project checklist that maps the GitHub brief to the generated files
 - summary metrics for the raw and cleaned dataset
 - an AI assistant grounded in the reports and targeted dataset evidence
+- a dedicated Fixed Dataset tab with remediation metrics, audit details, search, preview, and download
 - tabs for missing values, duplicates, variant detection, and cleaning
 - side-by-side raw vs cleaned row previews for quick comparison
 - direct download links for every generated report and dataset
@@ -95,7 +99,7 @@ streamlit run app.py
 
 You can also enter the key in the password field in the AI tab. The assistant
 does not send both 200 MB datasets to the model. It retrieves bounded excerpts
-from every report and scans the cleaned CSV only for a high-confidence exact
+from every report and scans the final fixed CSV only for a high-confidence exact
 organization or reference lookup.
 
 ## Notes
@@ -104,3 +108,8 @@ organization or reference lookup.
 - Only `status = accepted` mappings are applied to the cleaned file.
 - `review` rows remain in the mapping file for manual validation.
 - The cleaning step adds `recipient_legal_name_clean` and preserves the original column.
+- `data/processed/fichier_nettoye.csv` is organization-name cleaned only. The
+  missing-data treatments documented in the EDA report are not applied to that intermediate file.
+- `data/processed/fichier_corrige_eda.csv` is the final fixed dataset. It retains
+  the accepted organization-name corrections and applies the EDA missing-data
+  rules with auditable flags and status columns.
